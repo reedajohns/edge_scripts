@@ -10,10 +10,11 @@ import io
 import base64
 from PIL import Image
 import numpy as np
+from datetime import datetime
 
 # Whether to upload frames or not:
 upload_bool = True
-WORKFLOW_ID = "your_workflow_id"  # replace with your workflow ID
+frame_per_minute = 60 # limit to 60 uploads per minute
 
 # connecting to the first available camera
 camera = pylon.InstantCamera(pylon.TlFactory.GetInstance().CreateFirstDevice())
@@ -28,18 +29,17 @@ converter.OutputBitAlignment = pylon.OutputBitAlignment_MsbAligned
 
 class RateLimiter:
     def __init__(self, max_rate):
-        self.max_rate = max_rate
-        self.timestamps = deque()
+        self.interval = 60.0 / max_rate
+        self.last_upload = time.time()
 
     def __call__(self):
-        if len(self.timestamps) >= self.max_rate and time.time() - self.timestamps[0] < 60:
+        elapsed = time.time() - self.last_upload
+        if elapsed < self.interval:
             return False
-        if len(self.timestamps) >= self.max_rate:
-            self.timestamps.popleft()
-        self.timestamps.append(time.time())
+        self.last_upload = time.time()
         return True
 
-rate_limiter = RateLimiter(60)  # limit to 60 uploads per minute
+rate_limiter = RateLimiter(frame_per_minute)  # Rate limit uploads
 
 def numpy_array_to_jpeg(image):
     if not isinstance(image, np.ndarray):
@@ -60,19 +60,25 @@ def numpy_array_to_jpeg(image):
 def upload_frame(frame_count, frame):
     """Upload a single frame using API call."""
     if not rate_limiter():
-        print("Upload rate limit reached. Skipping this frame.")
+        print("Not yet time for next upload. Skipping this frame.")
         return
-
+    
     API_KEY = os.getenv('API_KEY')
-    WORKFLOW_ID = os.getenv('WORKFLOW_ID')
+    PROJECT_ID = os.getenv('PROJECT_ID')
     split = "train"
     image_name = f"image_upload_{frame_count}"
+
+    # Get current date and time and format it as a string
+    now = datetime.now()
+    timestamp = now.strftime("%Y-%m-%d_%H-%M-%S")
+    image_name = f"{timestamp}_frame_{frame_count}"
+    
     if API_KEY is None:
         print("API key not found")
         return
 
     url_list = [
-        f"https://api.roboflow.com/dataset/{WORKFLOW_ID}/upload",
+        f"https://api.roboflow.com/dataset/{PROJECT_ID}/upload",
         "?api_key=" + API_KEY,
         f"&batch=Uploaded Via Roboflow Edge"
     ]
@@ -114,15 +120,8 @@ while camera.IsGrabbing():
         image = converter.Convert(grabResult)
         img = image.GetArray()
 
-        # cv2.namedWindow('title', cv2.WINDOW_NORMAL)
-        # cv2.imshow('title', img)
-
         if upload_bool:
             executor.submit(upload_frame, img_count, img)
-
-        # k = cv2.waitKey(1)
-        # if k == 27:
-        #     break
 
         # Increase image counter
         img_count += 1
