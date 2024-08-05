@@ -17,6 +17,7 @@ from PIL import Image
 import requests
 from requests_toolbelt.multipart.encoder import MultipartEncoder
 import numpy as np
+import supervision as sv
 # Import Camera Frame Grabbers
 from LucidFrameProducer import LucidFrameProducer
 from BaslerFrameProducer import BaslerFrameProducer
@@ -63,34 +64,44 @@ if not WORKSPACE_NAME:
     raise ValueError('WORKSPACE_NAME environment variable not set')
 
 def annotate_image(image):
-    for pred in latest_predictions[0]:  # Extract the list of predictions from the outer list
-        center_x = pred['x']
-        center_y = pred['y']
-        width = pred['width']
-        height = pred['height']
-        class_label = pred['class']
+    detections = latest_predictions
 
-        # Calculate the top-left corner of the bounding box
-        top_left_x = int(center_x - width / 2)
-        top_left_y = int(center_y - height / 2)
+    annotated_image = sv.BoundingBoxAnnotator().annotate(
+    scene=image.copy(), detections=detections
+    )
+    annotated_image = sv.LabelAnnotator().annotate(
+        scene=annotated_image, detections=detections
+    )
+    image = annotated_image
+
+    # for pred in latest_predictions[0]:  # Extract the list of predictions from the outer list
+    #     center_x = pred['x']
+    #     center_y = pred['y']
+    #     width = pred['width']
+    #     height = pred['height']
+    #     class_label = pred['class']
+
+    #     # Calculate the top-left corner of the bounding box
+    #     top_left_x = int(center_x - width / 2)
+    #     top_left_y = int(center_y - height / 2)
         
-        # Calculate the bottom-right corner of the bounding box
-        bottom_right_x = int(center_x + width / 2)
-        bottom_right_y = int(center_y + height / 2)
+    #     # Calculate the bottom-right corner of the bounding box
+    #     bottom_right_x = int(center_x + width / 2)
+    #     bottom_right_y = int(center_y + height / 2)
 
-        # Draw the bounding box
-        cv2.rectangle(image, (top_left_x, top_left_y), (bottom_right_x, bottom_right_y), (0, 255, 0), 2)
+    #     # Draw the bounding box
+    #     cv2.rectangle(image, (top_left_x, top_left_y), (bottom_right_x, bottom_right_y), (0, 255, 0), 2)
 
-        # Put the label above the bounding box
-        label_size = cv2.getTextSize(class_label, cv2.FONT_HERSHEY_SIMPLEX, 0.5, 2)[0]
-        label_x = top_left_x
-        label_y = top_left_y - 10 if top_left_y - 10 > 10 else top_left_y + 10  # Ensure label is within image bounds
+    #     # Put the label above the bounding box
+    #     label_size = cv2.getTextSize(class_label, cv2.FONT_HERSHEY_SIMPLEX, 0.5, 2)[0]
+    #     label_x = top_left_x
+    #     label_y = top_left_y - 10 if top_left_y - 10 > 10 else top_left_y + 10  # Ensure label is within image bounds
 
-        # # Draw the label background
-        # cv2.rectangle(image, (label_x, label_y - label_size[1]), (label_x + label_size[0], label_y), (0, 255, 0), cv2.FILLED)
+    #     # # Draw the label background
+    #     # cv2.rectangle(image, (label_x, label_y - label_size[1]), (label_x + label_size[0], label_y), (0, 255, 0), cv2.FILLED)
 
-        # Put the label text on the image
-        cv2.putText(image, class_label, (label_x, label_y), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 0), 2)
+    #     # Put the label text on the image
+    #     cv2.putText(image, class_label, (label_x, label_y), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 0), 2)
 
     return image
 
