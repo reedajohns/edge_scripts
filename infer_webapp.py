@@ -317,7 +317,7 @@ pipeline = InferencePipeline.init_with_workflow(
     video_reference=VIDEO_REFERENCE,
     on_prediction=on_prediction,
     source_buffer_filling_strategy=BufferFillingStrategy.DROP_OLDEST,
-    source_buffer_consumption_strategy=BufferConsumptionStrategy.LAZY,
+    source_buffer_consumption_strategy=BufferConsumptionStrategy.EAGER,
 )
 
 pipeline.start()
